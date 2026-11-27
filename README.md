@@ -1,5 +1,6 @@
 # Face Detection using Haar Cascades with OpenCV and Matplotlib
-
+## Name: KOWSHIK RAM S
+## Reg no: 212225230143
 ## Aim
 
 To write a Python program using OpenCV to perform the following image manipulations:  
@@ -15,41 +16,171 @@ iv) Perform face detection with label in real-time video from webcam.
 - Matplotlib library (`matplotlib`)  
 - Jupyter Notebook or any Python IDE (e.g., VS Code, PyCharm)
 
+
 ## Algorithm
 
-### I) Load and Display Images
+```
+1. Import the required libraries such as OpenCV, NumPy, Matplotlib and OS.
 
-- Step 1: Import necessary packages: `numpy`, `cv2`, `matplotlib.pyplot`  
-- Step 2: Load grayscale images using `cv2.imread()` with flag `0`  
-- Step 3: Display images using `plt.imshow()` with `cmap='gray'`
+2. Read the input image using cv2.imread().
 
-### II) Load Haar Cascade Classifiers
+3. Convert the original image from BGR to RGB and display it.
 
-- Step 1: Load face and eye cascade XML files 
-### III) Perform Face Detection in Images
+4. Extract the Region of Interest (ROI) using array slicing.
 
-- Step 1: Define a function `detect_face()` that copies the input image  
-- Step 2: Use `face_cascade.detectMultiScale()` to detect faces  
-- Step 3: Draw white rectangles around detected faces with thickness 10  
-- Step 4: Return the processed image with rectangles  
+5. Create a mask and perform image segmentation using cv2.bitwise_and().
 
-### IV) Perform Eye Detection in Images
+6. Convert the image into grayscale using cv2.cvtColor().
 
-- Step 1: Define a function `detect_eyes()` that copies the input image  
-- Step 2: Use `eye_cascade.detectMultiScale()` to detect eyes  
-- Step 3: Draw white rectangles around detected eyes with thickness 10  
-- Step 4: Return the processed image with rectangles  
+7. Apply Gaussian Blur to reduce noise in the image.
 
-### V) Display Detection Results on Images
+8. Perform Canny Edge Detection and find contours using OpenCV functions.
 
-- Step 1: Call `detect_face()` or `detect_eyes()` on loaded images  
-- Step 2: Use `plt.imshow()` with `cmap='gray'` to display images with detected regions highlighted  
+9. Load the MobileNet-SSD model and detect objects with confidence greater than 0.5.
 
-### VI) Perform Face Detection on Real-Time Webcam Video
+10. Draw bounding boxes with object labels and display the final output images using Matplotlib.
 
-- Step 1: Capture video from webcam using `cv2.VideoCapture(0)`  
-- Step 2: Loop to continuously read frames from webcam  
-- Step 3: Apply `detect_face()` function on each frame  
-- Step 4: Display the video frame with rectangles around detected faces  
-- Step 5: Exit loop and close windows when ESC key (key code 27) is pressed  
-- Step 6: Release video capture and destroy all OpenCV windows  
+```
+  
+
+## Program
+
+```
+ import cv2
+import numpy as np
+import matplotlib.pyplot as plt
+import os
+
+# =========================
+# PART 1: ROI SEGMENTATION
+# =========================
+
+image = cv2.imread('spider.png')
+
+if image is None:
+   print("Error: spider.png not found")
+   exit()
+
+image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+
+plt.imshow(image_rgb)
+plt.title("Original Image")
+plt.axis('off')
+plt.show()
+
+# ROI
+roi = image[100:420, 200:550]
+
+mask = np.zeros_like(image)
+mask[100:420, 200:550] = roi
+
+segmented = cv2.bitwise_and(image, mask)
+
+plt.imshow(cv2.cvtColor(segmented, cv2.COLOR_BGR2RGB))
+plt.title("Segmented ROI")
+plt.axis('off')
+plt.show()
+
+
+# =========================
+# PART 2: EDGE DETECTION
+# =========================
+
+image = cv2.imread('spider.png')
+
+if image is None:
+   print("Error: spider.png not found")
+   exit()
+
+gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+blur = cv2.GaussianBlur(gray, (5, 5), 0)
+edges = cv2.Canny(blur, 50, 150)
+
+plt.imshow(edges, cmap='gray')
+plt.title("Canny Edge Detection")
+plt.axis('off')
+plt.show()
+
+contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+result = image.copy()
+
+for c in contours:
+   if cv2.contourArea(c) > 50:
+       x, y, w, h = cv2.boundingRect(c)
+       cv2.rectangle(result, (x, y), (x+w, y+h), (0, 255, 0), 2)
+
+plt.imshow(cv2.cvtColor(result, cv2.COLOR_BGR2RGB))
+plt.title("Contour Detection")
+plt.axis('off')
+plt.show()
+
+
+# =========================
+# PART 3: OBJECT DETECTION (SAFE VERSION)
+# =========================
+
+config_file = 'deploy.prototxt'
+weights_file = 'mobilenet_iter_73000.caffemodel'
+
+# If model files NOT found → skip safely
+if not os.path.exists(config_file) or not os.path.exists(weights_file):
+   print("⚠️ Model files not found → Skipping Object Detection part")
+else:
+   net = cv2.dnn.readNetFromCaffe(config_file, weights_file)
+
+   class_labels = {
+       0:'background',1:'aeroplane',2:'bicycle',3:'bird',4:'boat',
+       5:'bottle',6:'bus',7:'car',8:'cat',9:'chair',10:'cow',
+       11:'diningtable',12:'dog',13:'horse',14:'motorbike',
+       15:'person',16:'pottedplant',17:'sheep',18:'sofa',
+       19:'train',20:'tvmonitor'
+   }
+
+   image = cv2.imread('spider.png')
+
+   if image is None:
+       print("Error: spider.png not found")
+       exit()
+
+   (h, w) = image.shape[:2]
+
+   blob = cv2.dnn.blobFromImage(image, 0.007843, (300, 300), 127.5)
+   net.setInput(blob)
+   detections = net.forward()
+
+   for i in range(detections.shape[2]):
+       confidence = detections[0, 0, i, 2]
+
+       if confidence > 0.5:
+           idx = int(detections[0, 0, i, 1])
+           label = class_labels.get(idx, "Unknown")
+
+           box = detections[0, 0, i, 3:7] * np.array([w, h, w, h])
+           (startX, startY, endX, endY) = box.astype("int")
+
+           cv2.rectangle(image, (startX, startY), (endX, endY), (0, 255, 0), 2)
+           cv2.putText(image, label, (startX, startY - 10),
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 2)
+
+   plt.imshow(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
+   plt.title("Object Detection (MobileNet-SSD)")
+   plt.axis('off')
+   plt.show()
+```
+## Output
+<img width="517" height="515" alt="image" src="https://github.com/user-attachments/assets/d7e3bcdf-a3d6-4065-b9ba-21a016338f48" />
+
+<img width="516" height="528" alt="image" src="https://github.com/user-attachments/assets/b515bcc9-07ab-463f-ab6f-36209f57a0d3" />
+
+<img width="492" height="533" alt="image" src="https://github.com/user-attachments/assets/b95a2ae4-b730-4521-909c-03c91cd42c6a" />
+
+<img width="512" height="505" alt="image" src="https://github.com/user-attachments/assets/7c85bd65-4bc3-4e8f-b461-9415c7372150" />
+
+
+
+
+
+
+## Result :
+Thus, to write a Python program using OpenCV to perform image manipulations for the given objectives is executed sucessfully.
